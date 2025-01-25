@@ -58,8 +58,10 @@ def _raise_for_nullable_if_mldev(schema: types.Schema):
     )
 
 
-def _raise_if_schema_unsupported(client, schema: types.Schema):
-  if not client.vertexai:
+def _raise_if_schema_unsupported(
+    api_option: Literal['VERTEX_AI', 'GEMINI_API'], schema: types.Schema
+):
+  if api_option == 'GEMINI_API':
     _raise_for_any_of_if_mldev(schema)
     _raise_for_default_if_mldev(schema)
     _raise_for_nullable_if_mldev(schema)
@@ -111,7 +113,7 @@ def _is_default_value_compatible(
 
 
 def _parse_schema_from_parameter(
-    client,
+    api_option: Literal['VERTEX_AI', 'GEMINI_API'],
     param: inspect.Parameter,
     func_name: str,
 ) -> types.Schema:
@@ -131,7 +133,7 @@ def _parse_schema_from_parameter(
         raise ValueError(default_value_error_msg)
       schema.default = param.default
     schema.type = _py_builtin_type_to_schema_type[param.annotation]
-    _raise_if_schema_unsupported(client, schema)
+    _raise_if_schema_unsupported(api_option, schema)
     return schema
   if (
       isinstance(param.annotation, typing_types.UnionType)
@@ -150,7 +152,7 @@ def _parse_schema_from_parameter(
         schema.nullable = True
         continue
       schema_in_any_of = _parse_schema_from_parameter(
-          client,
+          api_option,
           inspect.Parameter(
               'item', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=arg
           ),
@@ -172,7 +174,7 @@ def _parse_schema_from_parameter(
       if not _is_default_value_compatible(param.default, param.annotation):
         raise ValueError(default_value_error_msg)
       schema.default = param.default
-    _raise_if_schema_unsupported(client, schema)
+    _raise_if_schema_unsupported(api_option, schema)
     return schema
   if isinstance(param.annotation, _GenericAlias) or isinstance(
       param.annotation, typing_types.GenericAlias
@@ -185,7 +187,7 @@ def _parse_schema_from_parameter(
         if not _is_default_value_compatible(param.default, param.annotation):
           raise ValueError(default_value_error_msg)
         schema.default = param.default
-      _raise_if_schema_unsupported(client, schema)
+      _raise_if_schema_unsupported(api_option, schema)
       return schema
     if origin is Literal:
       if not all(isinstance(arg, str) for arg in args):
@@ -198,12 +200,12 @@ def _parse_schema_from_parameter(
         if not _is_default_value_compatible(param.default, param.annotation):
           raise ValueError(default_value_error_msg)
         schema.default = param.default
-      _raise_if_schema_unsupported(client, schema)
+      _raise_if_schema_unsupported(api_option, schema)
       return schema
     if origin is list:
       schema.type = 'ARRAY'
       schema.items = _parse_schema_from_parameter(
-          client,
+          api_option,
           inspect.Parameter(
               'item',
               inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -215,7 +217,7 @@ def _parse_schema_from_parameter(
         if not _is_default_value_compatible(param.default, param.annotation):
           raise ValueError(default_value_error_msg)
         schema.default = param.default
-      _raise_if_schema_unsupported(client, schema)
+      _raise_if_schema_unsupported(api_option, schema)
       return schema
     if origin is Union:
       schema.any_of = []
@@ -226,7 +228,7 @@ def _parse_schema_from_parameter(
           schema.nullable = True
           continue
         schema_in_any_of = _parse_schema_from_parameter(
-            client,
+            api_option,
             inspect.Parameter(
                 'item',
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -261,7 +263,7 @@ def _parse_schema_from_parameter(
         if not _is_default_value_compatible(param.default, param.annotation):
           raise ValueError(default_value_error_msg)
         schema.default = param.default
-      _raise_if_schema_unsupported(client, schema)
+      _raise_if_schema_unsupported(api_option, schema)
       return schema
       # all other generic alias will be invoked in raise branch
   if (
@@ -278,7 +280,7 @@ def _parse_schema_from_parameter(
     schema.properties = {}
     for field_name, field_info in param.annotation.model_fields.items():
       schema.properties[field_name] = _parse_schema_from_parameter(
-          client,
+          api_option,
           inspect.Parameter(
               field_name,
               inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -286,7 +288,7 @@ def _parse_schema_from_parameter(
           ),
           func_name,
       )
-    _raise_if_schema_unsupported(client, schema)
+    _raise_if_schema_unsupported(api_option, schema)
     return schema
   raise ValueError(
       f'Failed to parse the parameter {param} of function {func_name} for'
