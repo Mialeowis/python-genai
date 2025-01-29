@@ -3252,7 +3252,8 @@ class GenerateImagesConfig(_common.BaseModel):
   )
   enhance_prompt: Optional[bool] = Field(
       default=None,
-      description="""Whether to use the prompt rewriting logic.
+      description="""Whether to use the prompt rewriting logic. Only supported for the
+      002 model.
       """,
   )
 
@@ -3325,7 +3326,8 @@ class GenerateImagesConfigDict(TypedDict, total=False):
       """
 
   enhance_prompt: Optional[bool]
-  """Whether to use the prompt rewriting logic.
+  """Whether to use the prompt rewriting logic. Only supported for the
+      002 model.
       """
 
 
@@ -3533,6 +3535,12 @@ class GeneratedImage(_common.BaseModel):
       response.
       """,
   )
+  enhanced_prompt: Optional[str] = Field(
+      default=None,
+      description="""The rewritten prompt used for the image generation if the prompt
+      enhancer is enabled.
+      """,
+  )
 
 
 class GeneratedImageDict(TypedDict, total=False):
@@ -3545,6 +3553,11 @@ class GeneratedImageDict(TypedDict, total=False):
   rai_filtered_reason: Optional[str]
   """Responsible AI filter reason if the image is filtered out of the
       response.
+      """
+
+  enhanced_prompt: Optional[str]
+  """The rewritten prompt used for the image generation if the prompt
+      enhancer is enabled.
       """
 
 
