@@ -29,7 +29,7 @@ from .pagers import AsyncPager, Pager
 def _Part_to_mldev(
     api_client: ApiClient,
     from_object: Union[dict, object],
-    parent_object: dict = None,
+    parent_object: Optional[dict] = None,
 ) -> dict:
   to_object = {}
   if getv(from_object, ['video_metadata']) is not None:
