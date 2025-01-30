@@ -2,6 +2,26 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
+# Copyright 2024
+# Licensed under MIT License
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -73,7 +93,7 @@ def _Part_to_mldev(
 def _Part_to_vertex(
     api_client: ApiClient,
     from_object: Union[dict, object],
-    parent_object: dict = None,
+    parent_object: Optional[dict] = None,
 ) -> dict:
   to_object = {}
   if getv(from_object, ['video_metadata']) is not None:
@@ -117,23 +137,25 @@ def _Part_to_vertex(
 def _Content_to_mldev(
     api_client: ApiClient,
     from_object: Union[dict, object],
-    parent_object: dict = None,
+    parent_object: Optional[dict] = None,
 ) -> dict:
-  to_object = {}
-  if getv(from_object, ['parts']) is not None:
-        setv(
-            to_object,
-            ['parts'],
-        [
-            _Part_to_mldev(api_client, item, to_object)
-            for item in getv(from_object, ['parts'])
-        ],
-    )
+    try:
+        to_object = {}
+        if getv(from_object, ['parts']) is not None:
+            parts = getv(from_object, ['parts'])
+            if parts and hasattr(parts, '__iter__'):
+                setv(
+                    to_object,
+                    ['parts'],
+                    [_Part_to_mldev(api_client, item, to_object) for item in parts],
+                )
 
-  if getv(from_object, ['role']) is not None:
-    setv(to_object, ['role'], getv(from_object, ['role']))
+        if getv(from_object, ['role']) is not None:
+            setv(to_object, ['role'], getv(from_object, ['role']))
 
-  return to_object
+        return to_object
+    except (KeyError, AttributeError, TypeError) as e:
+        raise ValueError(f"Invalid content format: {str(e)}")
 
 
 def _Content_to_vertex(
@@ -460,49 +482,68 @@ def _GoogleSearchRetrieval_to_vertex(
   return to_object
 
 
+def _safe_convert_list(
+    items: Optional[list],
+    converter_func: callable,
+    api_client: ApiClient,
+    to_object: dict
+) -> list:
+    """Safely converts a list of items using the provided converter function"""
+    if not items:
+        return []
+    if not hasattr(items, '__iter__'):
+        raise TypeError("Expected iterable")
+    try:
+        return [converter_func(api_client, item, to_object) for item in items]
+    except Exception as e:
+        raise ValueError(f"Failed to convert list items: {str(e)}")
+
+
 def _Tool_to_mldev(
     api_client: ApiClient,
     from_object: Union[dict, object],
     parent_object: dict = None,
 ) -> dict:
-  to_object = {}
-  if getv(from_object, ['function_declarations']) is not None:
-    setv(
-        to_object,
-        ['functionDeclarations'],
-        [
-            _FunctionDeclaration_to_mldev(api_client, item, to_object)
-            for item in getv(from_object, ['function_declarations'])
-        ],
-    )
+    try:
+        to_object = {}
+        
+        if getv(from_object, ['function_declarations']) is not None:
+            func_decls = getv(from_object, ['function_declarations'])
+            setv(
+                to_object,
+                ['functionDeclarations'],
+                _safe_convert_list(func_decls, _FunctionDeclaration_to_mldev, api_client, to_object)
+            )
 
-  if getv(from_object, ['retrieval']) is not None:
-    raise ValueError('retrieval parameter is not supported in Google AI.')
+        if getv(from_object, ['retrieval']) is not None:
+            raise ValueError('retrieval parameter is not supported in Google AI.')
 
-  if getv(from_object, ['google_search']) is not None:
-    setv(
-        to_object,
-        ['googleSearch'],
-        _GoogleSearch_to_mldev(
-            api_client, getv(from_object, ['google_search']), to_object
-        ),
-    )
+        if getv(from_object, ['google_search']) is not None:
+            setv(
+                to_object,
+                ['googleSearch'],
+                _GoogleSearch_to_mldev(
+                    api_client, getv(from_object, ['google_search']), to_object
+                ),
+            )
 
-  if getv(from_object, ['google_search_retrieval']) is not None:
-    setv(
-        to_object,
-        ['googleSearchRetrieval'],
-        _GoogleSearchRetrieval_to_mldev(
-            api_client,
-            getv(from_object, ['google_search_retrieval']),
-            to_object,
-        ),
-    )
+        if getv(from_object, ['google_search_retrieval']) is not None:
+            setv(
+                to_object,
+                ['googleSearchRetrieval'],
+                _GoogleSearchRetrieval_to_mldev(
+                    api_client,
+                    getv(from_object, ['google_search_retrieval']),
+                    to_object,
+                ),
+            )
 
-  if getv(from_object, ['code_execution']) is not None:
-    setv(to_object, ['codeExecution'], getv(from_object, ['code_execution']))
+        if getv(from_object, ['code_execution']) is not None:
+            setv(to_object, ['codeExecution'], getv(from_object, ['code_execution']))
 
-  return to_object
+        return to_object
+    except (KeyError, AttributeError, TypeError) as e:
+        raise ValueError(f"Invalid tool format: {str(e)}")
 
 
 def _Tool_to_vertex(
@@ -757,26 +798,37 @@ def _CreateCachedContentConfig_to_vertex(
 def _CreateCachedContentParameters_to_mldev(
     api_client: ApiClient,
     from_object: Union[dict, object],
-    parent_object: dict = None,
+    parent_object: Optional[dict] = None,
 ) -> dict:
-  to_object = {}
-  if getv(from_object, ['model']) is not None:
-    setv(
-        to_object,
-        ['model'],
-        t.t_caches_model(api_client, getv(from_object, ['model'])),
-    )
+    if not from_object:
+        raise ValueError("Parameters cannot be None")
+        
+    to_object = {}
+    try:
+        if getv(from_object, ['model']) is not None:
+            model = getv(from_object, ['model'])
+            if not isinstance(model, str):
+                raise TypeError("Model must be a string")
+            setv(
+                to_object,
+                ['model'],
+                t.t_caches_model(api_client, model),
+            )
 
-  if getv(from_object, ['config']) is not None:
-    setv(
-        to_object,
-        ['config'],
-        _CreateCachedContentConfig_to_mldev(
-            api_client, getv(from_object, ['config']), to_object
-        ),
-    )
-
-  return to_object
+        if getv(from_object, ['config']) is not None:
+            config = getv(from_object, ['config'])
+            if not isinstance(config, (dict, types.CreateCachedContentConfig)):
+                raise TypeError("Config must be a dict or CreateCachedContentConfig")
+            setv(
+                to_object,
+                ['config'],
+                _CreateCachedContentConfig_to_mldev(
+                    api_client, config, to_object
+                ),
+            )
+        return to_object
+    except (KeyError, AttributeError, TypeError) as e:
+        raise ValueError(f"Invalid parameter format: {str(e)}")
 
 
 def _CreateCachedContentParameters_to_vertex(
