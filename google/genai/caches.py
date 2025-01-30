@@ -121,9 +121,9 @@ def _Content_to_mldev(
 ) -> dict:
   to_object = {}
   if getv(from_object, ['parts']) is not None:
-    setv(
-        to_object,
-        ['parts'],
+        setv(
+            to_object,
+            ['parts'],
         [
             _Part_to_mldev(api_client, item, to_object)
             for item in getv(from_object, ['parts'])
